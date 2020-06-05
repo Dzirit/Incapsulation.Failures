@@ -6,27 +6,36 @@ using System.Threading.Tasks;
 
 namespace Incapsulation.Failures
 {
-
+    public enum FailureType
+    {
+        unexpectedShutdown,
+        nonResponding,
+        hardwareFailures,
+        connectionProblems
+    }
+    public class Device
+    {
+        public string Name { get; set; }
+        public int Id { get; set; }
+    }
+    public class Failure
+    {
+        public int DeviceId { get; set; }
+        public FailureType Type { get; set; }
+        public DateTime FailureDate { get; set; }
+        public static bool IsFailureSerious(FailureType failureType)
+        {
+            if ((int)failureType % 2 == 0) return true;
+            return false;
+        }
+    }
     public class Common
     {
-        public static int IsFailureSerious(int failureType)
+        
+        public static bool Earlier(DateTime failureDate, DateTime curDate)
         {
-            if (failureType%2==0) return 1;
-            return 0;
-        }
-
-
-        public static int Earlier(object[] v, int day, int month, int year)
-        {
-            int vYear = (int)v[2];
-            int vMonth = (int)v[1];
-            int vDay = (int)v[0];
-            if (vYear < year) return 1;
-            if (vYear > year) return 0;
-            if (vMonth < month) return 1;
-            if (vMonth > month) return 0;
-            if (vDay < day) return 1;
-            return 0;
+            if (failureDate < curDate) return true;
+            return false;
         }
     }
 
@@ -46,27 +55,51 @@ namespace Incapsulation.Failures
         /// <param name="devices"></param>
         /// <returns></returns>
         public static List<string> FindDevicesFailedBeforeDateObsolete(
-            int day,
+        int day,
             int month,
             int year,
-            int[] failureTypes, 
-            int[] deviceId, 
+            int[] failureTypes,
+            int[] deviceId,
             object[][] times,
             List<Dictionary<string, object>> devices)
         {
 
+            var curDate = new DateTime(year, month, day);
+            Failure[] failures = new Failure[failureTypes.Length];
+            Device[] devices1 = new Device[devices.Count];
+
+            for (int i=0;i<failureTypes.Length;i++)
+            {
+                failures[i] = new Failure();
+                failures[i].DeviceId = deviceId[i];
+                failures[i].FailureDate = new DateTime((int)times[i][2], (int)times[i][1], (int)times[i][0]);
+                failures[i].Type = (FailureType)failureTypes[i];
+                devices1[i] = new Device();
+                devices1[i].Id = (int)devices[i]["DeviceId"];
+                devices1[i].Name = (string)devices[i]["Name"];
+            }
+
+                return FindDevicesFailedBeforeDate(curDate,failures,devices1);
+        }
+        public static List<string> FindDevicesFailedBeforeDate(
+           DateTime curDate,
+           Failure[] failures,
+           Device[] devices)
+        {
+
             var problematicDevices = new HashSet<int>();
-            for (int i = 0; i < failureTypes.Length; i++)
-                if (Common.IsFailureSerious(failureTypes[i])==1 && Common.Earlier(times[i], day, month, year)==1)
-                    problematicDevices.Add(deviceId[i]);
+            for (int i = 0; i < failures.Length; i++)
+                if (Failure.IsFailureSerious(failures[i].Type) && Common.Earlier(failures[i].FailureDate, curDate))
+                    problematicDevices.Add(failures[i].DeviceId);
 
             var result = new List<string>();
             foreach (var device in devices)
-                if (problematicDevices.Contains((int)device["DeviceId"]))
-                    result.Add(device["Name"] as string);
+                if (problematicDevices.Contains(device.Id))
+                    result.Add(device.Name);
 
             return result;
         }
-           
+
+
     }
 }
